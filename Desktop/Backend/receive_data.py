@@ -43,7 +43,7 @@ channel.queue_bind(
 )
 
 def callback(ch, method, properties, body):
-    print(f" [x] Received {body.decode()}")
+    # print(f" [x] Received {body.decode()}")
     # Add your message processing logic here
     ch.basic_ack(delivery_tag=method.delivery_tag)  # Manual acknowledgment
     processor.add_reading(body.decode())  # Assuming you have a method to process the data
