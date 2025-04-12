@@ -1,9 +1,20 @@
 from flask import Flask, jsonify
 import os
 import json
+from flask_cors import CORS
+from flask import send_from_directory
+
 
 app = Flask(__name__)
-
+CORS(
+    app,
+    resources={
+        r"/api/*": {
+            "origins": "http://localhost:3000",  # Replace with your frontend URL
+            "supports_credentials": True  # <-- This allows credentials
+        }
+    }
+)
 # Configure paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SONGS_DIR = os.path.join(BASE_DIR, 'songs')
@@ -14,7 +25,7 @@ songs = [
         "title": "10nen sakura",
         "artist": "10nen sakura",
         "difficulty": 2,
-        "image_path": os.path.join("songs", "10nen sakura-jacket.png"),  
+        "image_path": os.path.join("songs", "10nen-sakura-jacket.png"),  
         "json_path": os.path.join("songs", "sakura.json")  
     },
     {
@@ -22,7 +33,7 @@ songs = [
         "title": "FLASHDANCE (WHAT A FEELING)",
         "artist": "MAGIKA",
         "difficulty": 1,
-        "image_path": os.path.join("songs", "FLASHDANCE (WHAT A FEELING)-jacket.png"),  
+        "image_path": os.path.join("songs", "FLASHDANCE-(WHAT-A-FEELING)-jacket.png"),  
         "json_path": os.path.join("songs", "flashdance.json")  
     },
     {
@@ -30,12 +41,16 @@ songs = [
         "title": "U Can't Touch This",
         "artist": "MC Hammer",
         "difficulty": 1,
-        "image_path": os.path.join("songs", "U Can't Touch This-jacket.png"),  
+        "image_path": os.path.join("songs", "U-Can't-Touch-This-jacket.png"),  
         "json_path": os.path.join("songs", "cant-touch.json")  
     }
     
 ]
 
+@app.route('/api/songs/<path:filename>')
+def serve_song_file(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), "songs"), filename)
+                               
 @app.route('/api/songs')
 def get_songs():
     return jsonify(songs)

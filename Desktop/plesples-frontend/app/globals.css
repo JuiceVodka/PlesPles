@@ -140,3 +140,5 @@
 .fade-out {
   animation: fadeOut 300ms ease-out forwards;
 }
+
+/* Remove hold note styles */
