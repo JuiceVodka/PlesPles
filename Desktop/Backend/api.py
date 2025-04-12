@@ -32,7 +32,7 @@ songs = [
         "id": 2,
         "title": "FLASHDANCE (WHAT A FEELING)",
         "artist": "MAGIKA",
-        "difficulty": 1,
+        "difficulty": 2,
         "image_path": os.path.join("songs", "FLASHDANCE-(WHAT-A-FEELING)-jacket.png"),  
         "json_path": os.path.join("songs", "flashdance.json")  
     },
@@ -40,9 +40,25 @@ songs = [
         "id": 3,
         "title": "U Can't Touch This",
         "artist": "MC Hammer",
-        "difficulty": 1,
+        "difficulty": 2,
         "image_path": os.path.join("songs", "U-Can't-Touch-This-jacket.png"),  
         "json_path": os.path.join("songs", "cant-touch.json")  
+    },
+    {
+        "id": 4,
+        "title": "Bad Romance",
+        "artist": "Lady Gaga",
+        "difficulty": 1,
+        "image_path": os.path.join("songs", "Bad-Romance-jacket.png"),  
+        "json_path": os.path.join("songs", "bad-romance.json")  
+    },
+    {
+        "id": 5,
+        "title": "Pocketful of sunshine",
+        "artist": "Natasha Bedingfield",
+        "difficulty": 1,
+        "image_path": os.path.join("songs", "Pocketful-Of-Sunshine-jacket.png"),  
+        "json_path": os.path.join("songs", "pocketful.json")  
     }
     
 ]
