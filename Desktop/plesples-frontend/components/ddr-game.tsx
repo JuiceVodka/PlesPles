@@ -50,6 +50,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   const [combo, setCombo] = useState(0)
   const [gameStarted, setGameStarted] = useState(false)
   const [showGifBackground, setShowGifBackground] = useState(false)
+  const [showOnFire, setShowOnFire] = useState(false)
   const [activeArrows, setActiveArrows] = useState<
     Array<{
       id: number
@@ -122,8 +123,12 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   // Update score and check for GIF background
   const updateScore = (newScore: number) => {
     setScore(newScore)
-    if (newScore >= 1000 && !showGifBackground) {
+    if (newScore >= 500 && !showGifBackground) {
       setShowGifBackground(true)
+      setShowOnFire(true)
+      setTimeout(() => {
+        setShowOnFire(false)
+      }, 3000)
     }
   }
 
@@ -317,6 +322,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     setActiveArrows([])
     setHitFeedback(null)
     setShowGifBackground(false)
+    setShowOnFire(false)
     processingArrowsRef.current = new Set()
     missedArrowsRef.current.clear()
     
@@ -504,6 +510,15 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
             alt="Game background" 
             className="h-full w-auto object-contain"
           />
+        </div>
+      )}
+
+      {/* On Fire text */}
+      {showOnFire && (
+        <div className="absolute right-1/4 top-1/3 transform -translate-y-1/2 z-30">
+          <div className="text-6xl font-bold text-yellow-400 retro-font animate-bounce">
+            ON FIRE!
+          </div>
         </div>
       )}
 
