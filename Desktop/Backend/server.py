@@ -26,6 +26,13 @@ def setup_rabbitmq():
         queue="plesples_queue",
         routing_key="plesples_data"
     )
+
+    channel.queue_declare(queue="plesples_queue2", durable=True)
+    channel.queue_bind(
+        exchange="plesples_exchange",
+        queue="plesples_queue2",
+        routing_key="plesples_data2"
+    )
     
     return channel, connection
 
@@ -35,6 +42,19 @@ processor = DataProcessor()  # Assuming you have a DataProcessor class in data_p
 def rabbitmq_callback(ch, method, properties, body):
     
     direction = processor.add_reading(body.decode())
+    if direction != None:    
+        message = json.dumps({
+            "direction": direction,
+        })
+        print(f"Sending message: {message}")
+        asyncio.run_coroutine_threadsafe(broadcast_message(message), websocket_loop)
+                
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+processor2 = DataProcessor()  # Assuming you have a DataProcessor class in data_processor.py
+def rabbitmq_callback2(ch, method, properties, body):
+    
+    direction = processor2.add_reading(body.decode())
     if direction != None:    
         message = json.dumps({
             "direction": direction,
@@ -64,6 +84,15 @@ def start_rabbitmq_consumer():
         channel.basic_consume(
             queue="plesples_queue",
             on_message_callback=rabbitmq_callback,
+            auto_ack=False
+        )
+        # print(" [*] RabbitMQ consumer started. Waiting for messages...")
+        # channel.start_consuming()
+
+        # channel.basic_qos(prefetch_count=1)
+        channel.basic_consume(
+            queue="plesples_queue2",
+            on_message_callback=rabbitmq_callback2,
             auto_ack=False
         )
         print(" [*] RabbitMQ consumer started. Waiting for messages...")
