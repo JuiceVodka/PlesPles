@@ -31,7 +31,7 @@ class DataProcessor:
         norm = np.sqrt(x_vector**2 + z_vector**2)
 
 
-        if norm > 5:
+        if norm > 3.5:
             normalized_x = x_vector / norm
             normalized_z = z_vector / norm
 
@@ -68,6 +68,7 @@ class DataProcessor:
                     self.right = True
 
         self.step += 1
+        return None
 
         
 

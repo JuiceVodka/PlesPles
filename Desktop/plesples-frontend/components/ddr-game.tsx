@@ -72,6 +72,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   const gameContainerRef = useRef<HTMLDivElement>(null)
   const gameStartTimeRef = useRef<number>(0)
   const processingArrowsRef = useRef<Set<number>>(new Set())
+  const missedArrowsRef = useRef<Set<number>>(new Set())
 
   // Define the hit line position (y-coordinate where the static arrows are)
   const HIT_LINE_POSITION = 30
@@ -125,9 +126,9 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     )
 
     if (matchingArrows.length === 0) {
-      // No arrows of this direction - simply ignore the key press
-      // Don't count as a miss or affect combo
-      return
+      // No arrows of this direction - completely ignore the key press
+      // Don't count as a miss, don't show feedback, don't affect combo
+      return;
     }
 
     // Calculate distance to hit line for each arrow
@@ -168,12 +169,9 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
         prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true } : arrow)),
       )
     } else {
-      //Miss - arrow too far from hit line
-      setCombo(0)
-      setHitFeedback({ text: "MISS!", color: "text-red-500" })
-      setActiveArrows((prev) =>
-        prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true, isMissed: true } : arrow)),
-      )
+      // Attempt to hit an arrow that's not in a hit zone
+      // Don't count as a miss, don't break combo, just ignore it
+      return;
     }
 
     // Remove the arrow after the animation completes
@@ -315,6 +313,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     setActiveArrows([])
     setHitFeedback(null)
     processingArrowsRef.current = new Set()
+    missedArrowsRef.current.clear()
     
     // Start playing audio
     if (audioElement) {
@@ -393,24 +392,32 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   useEffect(() => {
     if (!gameStarted) return
 
+    // Clear the missed arrows ref when game starts
+    missedArrowsRef.current.clear()
+
     const interval = setInterval(() => {
       setActiveArrows((prev) => {
         // Update positions
         const updatedArrows = prev.map((arrow) => {
-          // Don't move arrows that are fading out or missed
-          if (arrow.isFadingOut || arrow.isMissed) return arrow
+          // Don't move arrows that are fading out
+          if (arrow.isFadingOut) return arrow
 
           const newPosition = arrow.position + 1 // Speed of arrows moving up
 
           // Check if the arrow has passed the hit zone without being hit
+          // and hasn't been marked as missed yet
           if (newPosition > MISS_POSITION && !arrow.isMissed && !arrow.isFadingOut) {
-            // Mark as missed but leave on screen
-            setCombo(0) // Break combo for missed arrows
-            setHitFeedback({ text: "MISS!", color: "text-red-500" })
-            setTimeout(() => {
-              setHitFeedback(null)
-            }, 500)
+            // Only show miss feedback once per arrow
+            if (!missedArrowsRef.current.has(arrow.id)) {
+              missedArrowsRef.current.add(arrow.id)
+              setCombo(0) // Break combo for missed arrows
+              setHitFeedback({ text: "MISS!", color: "text-red-500" })
+              setTimeout(() => {
+                setHitFeedback(null)
+              }, 500)
+            }
             
+            // Mark as missed but keep it moving
             return {
               ...arrow,
               position: newPosition,
@@ -419,6 +426,16 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
             }
           }
 
+          // If arrow is already marked as missed, just keep it moving
+          if (arrow.isMissed) {
+            return {
+              ...arrow,
+              position: newPosition,
+              yPosition: calculateArrowYPosition(newPosition),
+            }
+          }
+
+          // Normal arrow movement
           return {
             ...arrow,
             position: newPosition,
@@ -426,18 +443,20 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
           }
         })
 
-        // Remove arrows that are completely off screen
-        // (much higher than needed to see them, but keep missed arrows on screen longer)
+        // Remove arrows that are completely off screen - very high threshold
+        // so missed arrows remain visible much longer
         const filteredArrows = updatedArrows.filter((arrow) => {
-          // Only remove arrows that are way past the top of the screen (position > 150)
-          return arrow.position <= 150;
+          return arrow.position <= 200; // Very high threshold to keep them visible longer
         })
 
         return filteredArrows
       })
     }, 16) // ~60fps
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      missedArrowsRef.current.clear()
+    }
   }, [gameStarted, MISS_POSITION])
 
   // Update arrow Y positions when container size changes
