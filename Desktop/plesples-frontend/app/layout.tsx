@@ -1,8 +1,13 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Audiowide } from "next/font/google"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
+const audiowide = Audiowide({ 
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-audiowide',
+})
 
 export const metadata: Metadata = {
   title: "Dance Dance Revolution",
@@ -16,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-gray-900 text-white`}>{children}</body>
+      <body className={`${inter.className} ${audiowide.variable} bg-gray-900 text-white`}>{children}</body>
     </html>
   )
 }

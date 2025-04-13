@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&display=swap');
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -73,6 +75,13 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Retro font class using Audiowide */
+.retro-font {
+  font-family: var(--font-audiowide), 'Audiowide', cursive;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 @keyframes feedback {
