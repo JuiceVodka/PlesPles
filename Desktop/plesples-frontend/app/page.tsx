@@ -18,7 +18,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
-      <h1 className="text-6xl font-bold mb-6 text-pink-500 retro-font animate-glow">DANCE DANCE REVOLUTION</h1>
+      <h1 className="text-6xl font-bold mb-6 text-pink-500 retro-font animate-glow">PlesPles</h1>
       <p className="text-2xl mb-12 text-gray-300">A rhythm game experience</p>
       
       <div className="space-y-4">

@@ -48,7 +48,14 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   const router = useRouter()
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
+  const [maxCombo, setMaxCombo] = useState(0)
   const [gameStarted, setGameStarted] = useState(false)
+  const [gameCompleted, setGameCompleted] = useState(false)
+  const [perfectHits, setPerfectHits] = useState(0)
+  const [greatHits, setGreatHits] = useState(0)
+  const [goodHits, setGoodHits] = useState(0)
+  const [missedHits, setMissedHits] = useState(0)
+  const [totalArrows, setTotalArrows] = useState(0)
   const [showGifBackground, setShowGifBackground] = useState(false)
   const [showOnFire, setShowOnFire] = useState(false)
   const [activeArrows, setActiveArrows] = useState<
@@ -62,7 +69,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     }>
   >([])
   const [nextArrowId, setNextArrowId] = useState(0)
-  const [hitFeedback, setHitFeedback] = useState<{ text: string; color: string } | null>(null)
+  const [hitFeedback, setHitFeedback] = useState<{ text: string; color: string; direction: string } | null>(null)
   const [pressedKeys, setPressedKeys] = useState<Record<string, boolean>>({
     left: false,
     down: false,
@@ -123,7 +130,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   // Update score and check for GIF background
   const updateScore = (newScore: number) => {
     setScore(newScore)
-    if (newScore >= 500 && !showGifBackground) {
+    if (newScore >= 1000 && !showGifBackground) {
       setShowGifBackground(true)
       setShowOnFire(true)
       setTimeout(() => {
@@ -132,7 +139,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     }
   }
 
-  // Modify the processArrowHit function to use updateScore
+  // Modify the processArrowHit function to include direction in hit feedback
   const processArrowHit = useCallback((direction: string) => {
     // Find arrows of the matching direction that aren't already marked as missed or fading out
     const matchingArrows = activeArrows.filter(
@@ -159,24 +166,39 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     if (closestArrow.distance <= 25) {
       // Perfect hit - precise threshold for truly perfect hits
       updateScore(score + 100)
-      setCombo((prev) => prev + 1)
-      setHitFeedback({ text: "PERFECT!", color: "text-yellow-300" })
+      const newCombo = combo + 1
+      setCombo(newCombo)
+      if (newCombo > maxCombo) {
+        setMaxCombo(newCombo)
+      }
+      setPerfectHits(prev => prev + 1)
+      setHitFeedback({ text: "PERFECT!", color: "text-yellow-300", direction: closestArrow.direction })
       setActiveArrows((prev) =>
         prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true } : arrow)),
       )
     } else if (closestArrow.distance <= 50) {
       // Great hit - expanded zone
       updateScore(score + 50)
-      setCombo((prev) => prev + 1)
-      setHitFeedback({ text: "GREAT!", color: "text-green-400" })
+      const newCombo = combo + 1
+      setCombo(newCombo)
+      if (newCombo > maxCombo) {
+        setMaxCombo(newCombo)
+      }
+      setGreatHits(prev => prev + 1)
+      setHitFeedback({ text: "GREAT!", color: "text-green-400", direction: closestArrow.direction })
       setActiveArrows((prev) =>
         prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true } : arrow)),
       )
     } else if (closestArrow.distance <= 85) {
       // Good hit - significantly larger zone for more forgiving gameplay
       updateScore(score + 10)
-      setCombo((prev) => prev + 1)
-      setHitFeedback({ text: "GOOD", color: "text-blue-400" })
+      const newCombo = combo + 1
+      setCombo(newCombo)
+      if (newCombo > maxCombo) {
+        setMaxCombo(newCombo)
+      }
+      setGoodHits(prev => prev + 1)
+      setHitFeedback({ text: "GOOD", color: "text-blue-400", direction: closestArrow.direction })
       setActiveArrows((prev) =>
         prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true } : arrow)),
       )
@@ -193,7 +215,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     setTimeout(() => {
       setHitFeedback(null)
     }, 500)
-  }, [activeArrows, HIT_LINE_POSITION, score])
+  }, [activeArrows, HIT_LINE_POSITION, score, combo, maxCombo])
 
   // Handle WebSocket messages for arrow inputs
   useEffect(() => {
@@ -351,8 +373,14 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   // Reset showGifBackground when game starts
   const startGame = () => {
     setGameStarted(true)
+    setGameCompleted(false)
     setScore(0)
     setCombo(0)
+    setMaxCombo(0)
+    setPerfectHits(0)
+    setGreatHits(0)
+    setGoodHits(0)
+    setMissedHits(0)
     setActiveArrows([])
     setHitFeedback(null)
     setShowGifBackground(false)
@@ -366,6 +394,28 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
       audioElement.play()
       gameStartTimeRef.current = Date.now()
     }
+  }
+
+  // Calculate accuracy percentage
+  const calculateAccuracy = (): number => {
+    const totalHits = perfectHits + greatHits + goodHits + missedHits;
+    if (totalHits === 0) return 0;
+    
+    // Weight perfect hits more than others
+    const weightedScore = (perfectHits * 100 + greatHits * 75 + goodHits * 50) / totalHits;
+    return Math.round(weightedScore);
+  }
+
+  // Get rank based on accuracy
+  const getRank = (): string => {
+    const accuracy = calculateAccuracy();
+    
+    if (accuracy >= 95) return 'S';
+    if (accuracy >= 90) return 'A';
+    if (accuracy >= 80) return 'B';
+    if (accuracy >= 70) return 'C';
+    if (accuracy >= 60) return 'D';
+    return 'F';
   }
 
   // Process song data and spawn arrows at the correct times
@@ -456,7 +506,8 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
             if (!missedArrowsRef.current.has(arrow.id)) {
               missedArrowsRef.current.add(arrow.id)
               setCombo(0) // Break combo for missed arrows
-              setHitFeedback({ text: "MISS!", color: "text-red-500" })
+              setMissedHits(prev => prev + 1)
+              setHitFeedback({ text: "MISS!", color: "text-red-500", direction: arrow.direction })
               setTimeout(() => {
                 setHitFeedback(null)
               }, 500)
@@ -504,6 +555,38 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     }
   }, [gameStarted, MISS_POSITION])
 
+  // Add audio ended event listener to detect when song is complete
+  useEffect(() => {
+    if (!audioElement || !gameStarted) return;
+
+    const handleAudioEnded = () => {
+      // Wait a bit to allow any final arrows to be processed
+      setTimeout(() => {
+        setGameCompleted(true);
+      }, 1000);
+    };
+
+    audioElement.addEventListener('ended', handleAudioEnded);
+
+    return () => {
+      audioElement.removeEventListener('ended', handleAudioEnded);
+    };
+  }, [audioElement, gameStarted]);
+
+  // Count total arrows when song data is loaded
+  useEffect(() => {
+    if (!songData) return;
+
+    let count = 0;
+    songData.steps.forEach(step => {
+      step.arrows.forEach(arrow => {
+        if (arrow > 0) count++;
+      });
+    });
+    
+    setTotalArrows(count);
+  }, [songData]);
+
   // Update arrow Y positions when container size changes
   useEffect(() => {
     if (!gameStarted) return
@@ -538,7 +621,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden relative">
       {/* Background GIF - only show when score >= 100 */}
       {showGifBackground && (
-        <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
+        <div className="absolute inset-0 z-0 flex items-center justify-center bg-black pointer-events-none">
           <img 
             src="/images/dance.gif" 
             alt="Game background" 
@@ -568,7 +651,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
       </div>
 
       {/* Back button in top right */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-30">
         <button 
           onClick={() => router.push('/songs')} 
           className="bg-gray-800 px-6 py-2 rounded-lg border-2 border-gray-700 shadow-md retro-font hover:bg-gray-700 transition-colors"
@@ -576,6 +659,8 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
           Back to Songs
         </button>
       </div>
+
+      
 
       {/* Input method indicator
       {gameStarted && (
@@ -590,7 +675,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
 
       {!gameStarted ? (
         <div className="flex flex-col items-center z-20">
-          <h1 className="text-5xl font-bold mb-6 text-pink-500 retro-font animate-glow">DANCE DANCE REVOLUTION</h1>
+          <h1 className="text-5xl font-bold mb-6 text-pink-500 retro-font animate-glow">PlesPles</h1>
           <div className="mb-6 text-xl text-center">
             <p className="text-2xl font-bold text-pink-300 retro-font">
               {songData ? `Now Playing: ${songData.metadata.title}` : 'Loading song...'}
@@ -622,10 +707,76 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
             </div>
           </div>
         </div>
+      ) : gameCompleted ? (
+        <div className="flex flex-col items-center justify-center bg-gray-900/90 rounded-lg p-8 border-4 border-pink-500 shadow-2xl max-w-2xl z-50">
+          <h2 className="text-5xl font-bold mb-6 text-pink-500 retro-font animate-glow">Game Complete!</h2>
+          
+          <div className="bg-gray-800 p-6 rounded-lg w-full mb-6">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h3 className="text-3xl retro-font text-white mb-2">{songData?.metadata.title}</h3>
+                <p className="text-gray-400">Final Score:</p>
+              </div>
+              <div className="text-5xl retro-font text-pink-400">{score}</div>
+            </div>
+            
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-gray-300">Accuracy:</p>
+              <p className="text-2xl retro-font text-blue-400">{calculateAccuracy()}%</p>
+            </div>
+            
+            <div className="flex justify-between items-center mb-8">
+              <p className="text-gray-300">Rank:</p>
+              <p className="text-6xl retro-font text-yellow-400">{getRank()}</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-pink-300 retro-font">Max Combo:</p>
+                <p className="text-2xl text-white">{maxCombo}</p>
+              </div>
+              <div>
+                <p className="text-yellow-300 retro-font">Perfect:</p>
+                <p className="text-2xl text-white">{perfectHits}</p>
+              </div>
+              <div>
+                <p className="text-green-400 retro-font">Great:</p>
+                <p className="text-2xl text-white">{greatHits}</p>
+              </div>
+              <div>
+                <p className="text-blue-400 retro-font">Good:</p>
+                <p className="text-2xl text-white">{goodHits}</p>
+              </div>
+              <div>
+                <p className="text-red-500 retro-font">Miss:</p>
+                <p className="text-2xl text-white">{missedHits}</p>
+              </div>
+              <div>
+                <p className="text-gray-300 retro-font">Total:</p>
+                <p className="text-2xl text-white">{totalArrows}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex gap-4">
+            <button 
+              onClick={startGame}
+              className="px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white text-xl font-bold rounded-lg shadow-lg transition-colors retro-font"
+            >
+              Play Again
+            </button>
+            <button 
+              onClick={() => router.push('/songs')}
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white text-xl font-bold rounded-lg shadow-lg transition-colors retro-font"
+            >
+              Song Select
+            </button>
+          </div>
+        </div>
       ) : (
         <div
           ref={gameContainerRef}
-          className="relative w-full h-full border-4 border-gray-700 bg-gray-800/50 overflow-hidden shadow-2xl shadow-pink-500/20 z-20"
+          className="relative w-full h-full border-4 border-gray-700 bg-gray-800/50 overflow-hidden shadow-2xl shadow-pink-500/20 z-10 pointer-events-auto"
         >
           {/* Target zone at the top */}
           <div className="absolute top-0 left-0 right-0 h-[160px] bg-gray-700/30 border-b-2 border-gray-600">
@@ -661,8 +812,17 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
 
           {/* Hit feedback */}
           {hitFeedback && (
-            <div className="absolute top-1/3 left-0 right-0 flex justify-center">
-              <div className={`text-6xl retro-font ${hitFeedback.color} animate-feedback shadow-lg`}>
+            <div className="absolute top-[180px] left-0 right-0 flex justify-center pointer-events-none">
+              <div 
+                className={`text-4xl font-bold retro-font ${hitFeedback.color} animate-feedback shadow-lg`}
+                style={{
+                  position: 'absolute',
+                  left: getDirectionOffset(hitFeedback.direction),
+                  transform: 'translateX(-100%)',
+                  width: 'auto',
+                  textAlign: 'center'
+                }}
+              >
                 {hitFeedback.text}
               </div>
             </div>
