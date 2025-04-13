@@ -49,6 +49,8 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
   const [gameStarted, setGameStarted] = useState(false)
+  const [showGifBackground, setShowGifBackground] = useState(false)
+  const [showOnFire, setShowOnFire] = useState(false)
   const [activeArrows, setActiveArrows] = useState<
     Array<{
       id: number
@@ -76,7 +78,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
 
   // Define the hit line position (y-coordinate where the static arrows are)
   const HIT_LINE_POSITION = 30
-  const MISS_POSITION = 125 // Increased from 105 to 125 for more forgiving misses
+  const MISS_POSITION = 150 // Increased for more forgiving gameplay - gives players more time to hit arrows
 
   const directions = ["left", "down", "up", "right"]
 
@@ -118,7 +120,19 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     loadSongData();
   }, [songId]);
 
-  // Shared function to process arrow hits - MOVED BEFORE handleKeyDown to avoid circular dependency
+  // Update score and check for GIF background
+  const updateScore = (newScore: number) => {
+    setScore(newScore)
+    if (newScore >= 500 && !showGifBackground) {
+      setShowGifBackground(true)
+      setShowOnFire(true)
+      setTimeout(() => {
+        setShowOnFire(false)
+      }, 3000)
+    }
+  }
+
+  // Modify the processArrowHit function to use updateScore
   const processArrowHit = useCallback((direction: string) => {
     // Find arrows of the matching direction that aren't already marked as missed or fading out
     const matchingArrows = activeArrows.filter(
@@ -126,15 +140,12 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     )
 
     if (matchingArrows.length === 0) {
-      // No arrows of this direction - completely ignore the key press
-      // Don't count as a miss, don't show feedback, don't affect combo
       return;
     }
 
     // Calculate distance to hit line for each arrow
     const arrowsWithDistance = matchingArrows.map((arrow) => ({
       ...arrow,
-      // Distance from the arrow to the hit line (absolute value)
       distance: Math.abs(arrow.yPosition - HIT_LINE_POSITION),
     }))
 
@@ -144,67 +155,77 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     const closestArrow = arrowsWithDistance[0]
 
     // Define hit zones based on distance to hit line (in pixels)
-    // Only process arrows that are within hit zones
+    // Increased hit zones for easier gameplay
     if (closestArrow.distance <= 25) {
-      // Perfect hit - increased from 15 to 25
-      setScore((prev) => prev + 100)
+      // Perfect hit - precise threshold for truly perfect hits
+      updateScore(score + 100)
       setCombo((prev) => prev + 1)
       setHitFeedback({ text: "PERFECT!", color: "text-yellow-300" })
       setActiveArrows((prev) =>
         prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true } : arrow)),
       )
-      
-      // Remove the arrow after the animation completes
-      setTimeout(() => {
-        setActiveArrows((prev) => prev.filter((arrow) => arrow.id !== closestArrow.id))
-      }, 300)
-      
-      // Clear feedback after a delay
-      setTimeout(() => {
-        setHitFeedback(null)
-      }, 500)
     } else if (closestArrow.distance <= 50) {
-      // Great hit - increased from 30 to 50
-      setScore((prev) => prev + 50)
+      // Great hit - expanded zone
+      updateScore(score + 50)
       setCombo((prev) => prev + 1)
       setHitFeedback({ text: "GREAT!", color: "text-green-400" })
       setActiveArrows((prev) =>
         prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true } : arrow)),
       )
-      
-      // Remove the arrow after the animation completes
-      setTimeout(() => {
-        setActiveArrows((prev) => prev.filter((arrow) => arrow.id !== closestArrow.id))
-      }, 300)
-      
-      // Clear feedback after a delay
-      setTimeout(() => {
-        setHitFeedback(null)
-      }, 500)
-    } else if (closestArrow.distance <= 75) {
-      // Good hit - increased from 45 to 75
-      setScore((prev) => prev + 10)
+    } else if (closestArrow.distance <= 85) {
+      // Good hit - significantly larger zone for more forgiving gameplay
+      updateScore(score + 10)
       setCombo((prev) => prev + 1)
       setHitFeedback({ text: "GOOD", color: "text-blue-400" })
       setActiveArrows((prev) =>
         prev.map((arrow) => (arrow.id === closestArrow.id ? { ...arrow, isFadingOut: true } : arrow)),
       )
-      
-      // Remove the arrow after the animation completes
-      setTimeout(() => {
-        setActiveArrows((prev) => prev.filter((arrow) => arrow.id !== closestArrow.id))
-      }, 300)
-      
-      // Clear feedback after a delay
-      setTimeout(() => {
-        setHitFeedback(null)
-      }, 500)
     } else {
-      // Arrow is too far from hit zone - don't remove it or mark as missed
-      // This way, players can try again when the arrow gets closer
       return;
     }
-  }, [activeArrows, HIT_LINE_POSITION])
+
+    // Remove the arrow after the animation completes
+    setTimeout(() => {
+      setActiveArrows((prev) => prev.filter((arrow) => arrow.id !== closestArrow.id))
+    }, 300)
+
+    // Clear feedback after a delay
+    setTimeout(() => {
+      setHitFeedback(null)
+    }, 500)
+  }, [activeArrows, HIT_LINE_POSITION, score])
+
+  // Handle WebSocket messages for arrow inputs
+  useEffect(() => {
+    if (!gameStarted || !socket) return
+
+    const handleSocketMessage = (event: MessageEvent) => {
+      // event.data is in the form {"direction": "left"}
+      const direction = JSON.parse(event.data)['direction']
+      
+      if (!["left", "down", "up", "right"].includes(direction)) {
+        console.log('Invalid direction received:', direction)
+        return
+      }
+
+      // Update pressed keys state
+      setPressedKeys((prev) => ({ ...prev, [direction]: true }))
+      
+      // Process arrow hit
+      processArrowHit(direction)
+      
+      // Reset pressed key state after a short delay
+      setTimeout(() => {
+        setPressedKeys((prev) => ({ ...prev, [direction]: false }))
+      }, 100)
+    }
+
+    socket.addEventListener('message', handleSocketMessage)
+    
+    return () => {
+      socket.removeEventListener('message', handleSocketMessage)
+    }
+  }, [gameStarted, processArrowHit, socket])
 
   // Keyboard input handler
   const handleKeyDown = useCallback(
@@ -327,13 +348,15 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
     }
   }, [gameStarted, router, useKeyboard, socket, handleKeyDown, handleKeyUp])
 
-  // Game start function
+  // Reset showGifBackground when game starts
   const startGame = () => {
     setGameStarted(true)
     setScore(0)
     setCombo(0)
     setActiveArrows([])
     setHitFeedback(null)
+    setShowGifBackground(false)
+    setShowOnFire(false)
     processingArrowsRef.current = new Set()
     missedArrowsRef.current.clear()
     
@@ -512,8 +535,28 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
   }, [audioElement])
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden bg-gray-900 text-white">
-      <div className="absolute top-4 left-4 z-10">
+    <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden relative">
+      {/* Background GIF - only show when score >= 100 */}
+      {showGifBackground && (
+        <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
+          <img 
+            src="/images/dance.gif" 
+            alt="Game background" 
+            className="h-full w-auto object-contain"
+          />
+        </div>
+      )}
+
+      {/* On Fire text */}
+      {showOnFire && (
+        <div className="absolute right-1/4 top-1/3 transform -translate-y-1/2 z-30">
+          <div className="text-6xl font-bold text-yellow-400 retro-font animate-bounce">
+            ON FIRE!
+          </div>
+        </div>
+      )}
+
+      <div className="absolute top-4 left-4 z-20">
         <div className="flex flex-col gap-2">
           <div className="text-2xl bg-gray-800 px-6 py-2 rounded-lg border-2 border-gray-700 shadow-md retro-font">
             Score: <span className="font-bold text-pink-400">{score}</span>
@@ -546,7 +589,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
       )} */}
 
       {!gameStarted ? (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center z-20">
           <h1 className="text-5xl font-bold mb-6 text-pink-500 retro-font animate-glow">DANCE DANCE REVOLUTION</h1>
           <div className="mb-6 text-xl text-center">
             <p className="text-2xl font-bold text-pink-300 retro-font">
@@ -582,7 +625,7 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
       ) : (
         <div
           ref={gameContainerRef}
-          className="relative w-full h-full border-4 border-gray-700 bg-gray-800 overflow-hidden shadow-2xl shadow-pink-500/20"
+          className="relative w-full h-full border-4 border-gray-700 bg-gray-800/50 overflow-hidden shadow-2xl shadow-pink-500/20 z-20"
         >
           {/* Target zone at the top */}
           <div className="absolute top-0 left-0 right-0 h-[160px] bg-gray-700/30 border-b-2 border-gray-600">
@@ -601,8 +644,8 @@ export default function DDRGame({ songId, socket, useKeyboard = false }: DDRGame
             ))}
           </div>
 
-          {/* Hit line */}
-          <div className="absolute top-[160px] left-0 right-0 h-[10px] bg-pink-500 shadow-lg shadow-pink-500/50 animate-pulse" />
+          {/* Hit line - removed animation for better performance */}
+          <div className="absolute top-[160px] left-0 right-0 h-[10px] bg-pink-500 shadow-lg shadow-pink-500/50" />
 
           {/* Moving arrows */}
           {activeArrows.map((arrow) => (

@@ -13,7 +13,7 @@ def setup_rabbitmq():
     credentials = pika.PlainCredentials("admin", "password")
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(
-            host="10.32.245.206",
+            host="localhost",
             virtual_host="plesples_vhost",
             credentials=credentials
         )
