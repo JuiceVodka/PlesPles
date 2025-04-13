@@ -10,7 +10,7 @@ const audiowide = Audiowide({
 })
 
 export const metadata: Metadata = {
-  title: "Dance Dance Revolution",
+  title: "PlesPles",
   description: "A DDR-style rhythm game built with Next.js",
 }
 

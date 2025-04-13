@@ -1,6 +1,6 @@
 # DDR Game
 
-A Dance Dance Revolution (DDR) style game built with Next.js and Tailwind CSS.
+PlesPles, a Dance Dance Revolution (DDR) style game built with Next.js and Tailwind CSS.
 
 ## Features
 
